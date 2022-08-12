@@ -1,4 +1,5 @@
-use ipc::Result;
+use ipc::sem::Semaphore;
+use ipc::{flags, Result};
 use std::net::UdpSocket;
 use std::process;
 use std::time::{Duration, Instant};
@@ -17,10 +18,23 @@ fn main() -> Result<()> {
     let mut buf = Vec::with_capacity(size as _);
     buf.resize(buf.capacity(), 0);
 
+    let sem = Semaphore::open("/sem_test", flags::O_RDWR | flags::O_CREAT, 0o666, 0)?;
+
     match ipc::fork()? {
         0 => {
             let mut sum: isize = 0;
-            let udp_svr = UdpSocket::bind("0.0.0.0:18899")?;
+            let udp_svr = loop {
+                match UdpSocket::bind("0.0.0.0:18899") {
+                    Ok(udp) => break udp,
+                    _ => {
+                        eprintln!("start to retry");
+                        thread::sleep(Duration::from_secs(1));
+                    }
+                }
+            };
+            // notify parent process
+            sem.post()?;
+
             for _ in 0..count {
                 sum += udp_svr.recv(&mut buf)? as isize;
             }
@@ -29,8 +43,9 @@ fn main() -> Result<()> {
             }
         }
         _pid => {
-            // waiting for the server to start
-            thread::sleep(Duration::from_secs(1));
+            // wait for peer to start
+            sem.wait()?;
+            sem.unlink_self()?;
 
             let udp_cli = UdpSocket::bind("0.0.0.0:12345")?;
             udp_cli.connect("0.0.0.0:18899")?;

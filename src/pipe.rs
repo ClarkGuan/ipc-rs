@@ -27,7 +27,7 @@ pub fn pipe() -> Result<(PipeReader, PipeWriter)> {
         let mut fds: [libc::c_int; 2] = [0, 0];
         let ret = libc::pipe(fds.as_mut_ptr());
         if ret == -1 {
-            return_errno!();
+            return_errno!("pipe");
         }
         Ok((PipeReader(RawFd(fds[0])), PipeWriter(RawFd(fds[1]))))
     }
@@ -38,20 +38,9 @@ pub fn pipe2(flags: isize) -> Result<(PipeReader, PipeWriter)> {
         let mut fds: [libc::c_int; 2] = [0, 0];
         let ret = libc::pipe2(fds.as_mut_ptr(), flags as _);
         if ret == -1 {
-            return_errno!();
+            return_errno!("pipe2");
         }
         Ok((PipeReader(RawFd(fds[0])), PipeWriter(RawFd(fds[1]))))
-    }
-}
-
-pub fn mkfifo(path: &str, mode: isize) -> Result<()> {
-    unsafe {
-        let path = CString::new(path)?;
-        let ret = libc::mkfifo(path.as_ptr(), mode as _);
-        if ret == -1 {
-            return_errno!();
-        }
-        Ok(())
     }
 }
 
@@ -69,11 +58,11 @@ impl Fifo {
             let c_path = CString::new(path)?;
             let ret = libc::mkfifo(c_path.as_ptr(), mode as _);
             if ret == -1 {
-                return_errno!();
+                return_errno!("mkfifo");
             }
             let fd = libc::open(c_path.as_ptr(), flags as _);
             if fd == -1 {
-                return_errno!();
+                return_errno!("open");
             }
             Ok(Fifo { raw: RawFd(fd), path: path.to_string() })
         }
