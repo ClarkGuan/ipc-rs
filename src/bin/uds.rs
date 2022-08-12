@@ -24,6 +24,8 @@ fn main() -> Result<()> {
     match ipc::fork()? {
         0 => {
             let listener = UnixListener::bind(path)?;
+            sem.post()?;
+
             let (mut stream, _) = listener.accept()?;
             let mut sum: isize = 0;
             for _ in 0..count {

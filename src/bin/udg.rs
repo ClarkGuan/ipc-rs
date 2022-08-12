@@ -1,7 +1,8 @@
+use ipc::sem::Semaphore;
 use ipc::{flags, Result};
 use std::os::unix::net::UnixDatagram;
-use std::time::{Duration, Instant};
-use std::{env, fs, process, thread};
+use std::time::Instant;
+use std::{env, fs, process};
 
 fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
@@ -17,10 +18,13 @@ fn main() -> Result<()> {
     buf.resize(buf.capacity(), 0);
 
     let path = "./udg-test";
+    let sem = Semaphore::open("/sem_test", flags::O_CREAT | flags::O_RDWR, 0o666, 0)?;
 
     match ipc::fork()? {
         0 => {
             let datagram = UnixDatagram::bind(path)?;
+            sem.post()?;
+
             let mut sum: isize = 0;
             for _ in 0..count {
                 sum += datagram.recv(&mut buf)? as isize;
@@ -31,8 +35,8 @@ fn main() -> Result<()> {
         }
 
         pid => {
-            // waiting for the pear to bind
-            thread::sleep(Duration::from_secs(1));
+            sem.wait()?;
+            sem.unlink_self()?;
 
             let datagram = UnixDatagram::unbound()?;
             datagram.connect(path)?;
