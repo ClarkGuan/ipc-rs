@@ -1,7 +1,6 @@
 use ipc::Result;
 use std::env;
-use std::io::{Read, Write};
-use std::os::unix::net::UnixStream;
+use std::os::unix::net::UnixDatagram;
 use std::process;
 use std::time::Instant;
 
@@ -18,13 +17,13 @@ fn main() -> Result<()> {
     let mut buf = Vec::with_capacity(size as _);
     buf.resize(buf.capacity(), 0);
 
-    let (mut stream1, mut stream2) = UnixStream::pair()?;
+    let (datagram1, datagram2) = UnixDatagram::pair()?;
 
     match ipc::fork()? {
         0 => {
             let mut sum: isize = 0;
             for _ in 0..count {
-                sum += stream1.read(&mut buf)? as isize;
+                sum += datagram1.recv(&mut buf)? as isize;
             }
             if sum != count * size {
                 eprintln!("sum error: {} != {}", sum, count * size);
@@ -34,7 +33,7 @@ fn main() -> Result<()> {
         _pid => {
             let start = Instant::now();
             for _ in 0..count {
-                if stream2.write(&buf)? != buf.len() {
+                if datagram2.send(&buf)? != buf.len() {
                     eprintln!("write error");
                     process::exit(1);
                 }
