@@ -1,4 +1,4 @@
-use ipc::Result;
+use ipc::{flags, Result};
 use std::os::unix::net::UnixDatagram;
 use std::time::{Duration, Instant};
 use std::{env, fs, process, thread};
@@ -30,7 +30,7 @@ fn main() -> Result<()> {
             }
         }
 
-        _pid => {
+        pid => {
             // waiting for the pear to bind
             thread::sleep(Duration::from_secs(1));
 
@@ -51,6 +51,7 @@ fn main() -> Result<()> {
                 count as f64 / sec
             );
 
+            ipc::waitpid(pid, flags::WNOHANG)?;
             let _ = fs::remove_file(path);
         }
     }

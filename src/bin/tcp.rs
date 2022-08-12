@@ -1,9 +1,9 @@
-use ipc::Result;
+use ipc::{flags, Result};
+use std::env;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::process;
-use std::time::{Duration, Instant};
-use std::{env, thread};
+use std::time::Instant;
 
 fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
@@ -18,9 +18,13 @@ fn main() -> Result<()> {
     let mut buf = Vec::with_capacity(size as _);
     buf.resize(buf.capacity(), 0);
 
+    let sem = ipc::sem::Semaphore::open("/sem_test", flags::O_CREAT | flags::O_RDWR, 0o666, 0)?;
+
     match ipc::fork()? {
         0 => {
             let listener = TcpListener::bind("0.0.0.0:18899")?;
+            sem.post()?;
+
             let (mut tcp, _) = listener.accept()?;
             let mut sum: isize = 0;
             loop {
@@ -34,9 +38,9 @@ fn main() -> Result<()> {
                 eprintln!("sum error: {} != {}", sum, count * size);
             }
         }
-        _pid => {
-            // waiting for the server to start
-            thread::sleep(Duration::from_secs(1));
+        pid => {
+            sem.wait()?;
+            sem.unlink_self()?;
 
             let mut tcp = TcpStream::connect("0.0.0.0:18899")?;
             let start = Instant::now();
@@ -53,6 +57,8 @@ fn main() -> Result<()> {
                 (size * count) as f64 / sec / (1024 * 1024) as f64,
                 count as f64 / sec
             );
+
+            ipc::waitpid(pid, flags::WNOHANG)?;
         }
     }
 

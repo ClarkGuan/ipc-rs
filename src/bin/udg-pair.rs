@@ -1,4 +1,4 @@
-use ipc::Result;
+use ipc::{flags, Result};
 use std::env;
 use std::os::unix::net::UnixDatagram;
 use std::process;
@@ -30,7 +30,7 @@ fn main() -> Result<()> {
             }
         }
 
-        _pid => {
+        pid => {
             let start = Instant::now();
             for _ in 0..count {
                 if datagram2.send(&buf)? != buf.len() {
@@ -45,6 +45,8 @@ fn main() -> Result<()> {
                 (size * count) as f64 / sec / (1024 * 1024) as f64,
                 count as f64 / sec
             );
+
+            ipc::waitpid(pid, flags::WNOHANG)?;
         }
     }
 

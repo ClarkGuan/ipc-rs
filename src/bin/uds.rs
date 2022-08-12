@@ -1,8 +1,9 @@
-use ipc::Result;
+use ipc::sem::Semaphore;
+use ipc::{flags, Result};
 use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::time::{Duration, Instant};
-use std::{env, fs, process, thread};
+use std::time::Instant;
+use std::{env, fs, process};
 
 fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
@@ -18,6 +19,7 @@ fn main() -> Result<()> {
     buf.resize(buf.capacity(), 0);
 
     let path = "./uds-test";
+    let sem = Semaphore::open("/sem_test", flags::O_RDWR | flags::O_CREAT, 0o666, 0)?;
 
     match ipc::fork()? {
         0 => {
@@ -32,9 +34,9 @@ fn main() -> Result<()> {
             }
         }
 
-        _pid => {
-            // waiting for the server to start
-            thread::sleep(Duration::from_secs(1));
+        pid => {
+            sem.wait()?;
+            sem.unlink_self()?;
 
             let mut stream = UnixStream::connect(path)?;
             let start = Instant::now();
@@ -52,6 +54,7 @@ fn main() -> Result<()> {
                 count as f64 / sec
             );
 
+            ipc::waitpid(pid, flags::WNOHANG)?;
             let _ = fs::remove_file(path);
         }
     }

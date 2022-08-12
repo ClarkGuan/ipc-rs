@@ -36,7 +36,7 @@ fn main() -> Result<()> {
             sem.post()?;
             // 超时 5s，无论如何都要退出
             // 有可能出现丢包，造成没读到 count 个包无法退出循环
-            udp_svr.set_read_timeout(Some(Duration::from_secs(5)))?;
+            udp_svr.set_read_timeout(Some(Duration::from_secs(2)))?;
             for _ in 0..count {
                 sum += udp_svr.recv(&mut buf)? as isize;
             }
@@ -44,7 +44,7 @@ fn main() -> Result<()> {
                 eprintln!("sum error: {} != {}", sum, count * size);
             }
         }
-        _pid => {
+        pid => {
             // wait for peer to start
             sem.wait()?;
             sem.unlink_self()?;
@@ -65,6 +65,8 @@ fn main() -> Result<()> {
                 (size * count) as f64 / sec / (1024 * 1024) as f64,
                 count as f64 / sec
             );
+
+            ipc::waitpid(pid, flags::WNOHANG)?;
         }
     }
 

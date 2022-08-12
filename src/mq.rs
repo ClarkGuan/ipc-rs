@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{Error, Result};
 use std::ffi::CString;
 use std::fmt::{Debug, Formatter};
 use std::mem::MaybeUninit;
@@ -49,7 +49,13 @@ impl MessageQueue {
     }
 
     pub fn unlink_self(self) -> Result<()> {
-        Self::unlink(&self.name)
+        match Self::unlink(&self.name) {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                let (errno, msg) = err.into_errno();
+                Err(Error::Mq(self, errno, msg))
+            }
+        }
     }
 
     pub fn unlink(name: &str) -> Result<()> {

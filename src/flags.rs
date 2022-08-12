@@ -7,3 +7,7 @@ pub const O_RDWR: isize = libc::O_RDWR as _;
 pub const O_NONBLOCK: isize = libc::O_NONBLOCK as _;
 pub const O_CLOEXEC: isize = libc::O_CLOEXEC as _;
 pub const O_DIRECT: isize = libc::O_DIRECT as _;
+
+pub const WNOHANG: isize = libc::WNOHANG as _;
+pub const WUNTRACED: isize = libc::WUNTRACED as _;
+pub const WCONTINUED: isize = libc::WCONTINUED as _;

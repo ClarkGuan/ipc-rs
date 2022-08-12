@@ -1,6 +1,8 @@
+use crate::mq::MessageQueue;
 use crate::sem::Semaphore;
 use crate::Result;
 use std::ffi::{CStr, NulError};
+use std::panic;
 use std::str::Utf8Error;
 
 #[derive(Debug, thiserror::Error)]
@@ -22,6 +24,9 @@ pub enum Error {
 
     #[error("sem errno: {1}, msg: {2}")]
     Sem(Semaphore, libc::c_int, String),
+
+    #[error("mq errno: {1}, msg: {2}")]
+    Mq(MessageQueue, libc::c_int, String),
 }
 
 impl Error {
@@ -35,6 +40,13 @@ impl Error {
     pub fn into_sem(self) -> (Semaphore, libc::c_int, String) {
         match self {
             Error::Sem(sem, errno, msg) => (sem, errno, msg),
+            _ => panic!("can't into"),
+        }
+    }
+
+    pub fn into_mq(self) -> (MessageQueue, libc::c_int, String) {
+        match self {
+            Error::Mq(mq, errno, msg) => (mq, errno, msg),
             _ => panic!("can't into"),
         }
     }

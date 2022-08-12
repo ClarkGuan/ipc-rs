@@ -1,4 +1,4 @@
-use ipc::Result;
+use ipc::{flags, Result};
 use std::env;
 use std::io::{Read, Write};
 use std::process;
@@ -31,7 +31,7 @@ fn main() -> Result<()> {
                 eprintln!("sum error: {} != {}", sum, count * size);
             }
         }
-        _pid => {
+        pid => {
             drop(reader);
 
             let start = Instant::now();
@@ -48,6 +48,8 @@ fn main() -> Result<()> {
                 (size * count) as f64 / sec / (1024 * 1024) as f64,
                 count as f64 / sec
             );
+
+            ipc::waitpid(pid, flags::WNOHANG)?;
         }
     }
 

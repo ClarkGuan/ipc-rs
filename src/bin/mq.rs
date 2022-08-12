@@ -33,7 +33,7 @@ fn main() -> Result<()> {
                 eprintln!("sum error: {} != {}", sum, count * size);
             }
         }
-        _pid => {
+        pid => {
             let start = Instant::now();
             for _ in 0..count {
                 let tmp = &buf[..size as usize];
@@ -50,6 +50,7 @@ fn main() -> Result<()> {
                 count as f64 / sec
             );
 
+            ipc::waitpid(pid, flags::WNOHANG)?;
             msg_queue.unlink_self()?;
         }
     }
