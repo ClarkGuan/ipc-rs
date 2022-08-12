@@ -23,8 +23,8 @@ fn main() -> Result<()> {
     let mut buf = Vec::with_capacity(attribute.message_size() as _);
     buf.resize(buf.capacity(), 0);
 
-    match ipc::fork() {
-        Ok(0) => {
+    match ipc::fork()? {
+        0 => {
             let mut sum: isize = 0;
             for _ in 0..count {
                 sum += msg_queue.read(&mut buf)? as isize;
@@ -33,7 +33,7 @@ fn main() -> Result<()> {
                 eprintln!("sum error: {} != {}", sum, count * size);
             }
         }
-        Ok(_pid) => {
+        _pid => {
             let start = Instant::now();
             for _ in 0..count {
                 let tmp = &buf[..size as usize];
@@ -52,7 +52,6 @@ fn main() -> Result<()> {
 
             msg_queue.unlink_self()?;
         }
-        Err(err) => return Err(err),
     }
 
     Ok(())

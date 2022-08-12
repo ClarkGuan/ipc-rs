@@ -22,8 +22,8 @@ fn main() -> Result<()> {
     let mut buf = Vec::with_capacity(size as _);
     buf.resize(buf.capacity(), 0);
 
-    match ipc::fork() {
-        Ok(0) => {
+    match ipc::fork()? {
+        0 => {
             let mut sum: isize = 0;
             for _i in 0..count {
                 sum += fifo.read(&mut buf)? as isize;
@@ -32,7 +32,7 @@ fn main() -> Result<()> {
                 eprintln!("sum error: {} != {}", sum, count * size);
             }
         }
-        Ok(_pid) => {
+        _pid => {
             let start = Instant::now();
             for _ in 0..count {
                 if fifo.write(&buf)? != buf.len() {
@@ -48,7 +48,6 @@ fn main() -> Result<()> {
                 count as f64 / sec
             );
         }
-        Err(err) => return Err(err),
     }
 
     Ok(())

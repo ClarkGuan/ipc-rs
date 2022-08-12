@@ -18,8 +18,8 @@ fn main() -> Result<()> {
     let mut buf = Vec::with_capacity(size as _);
     buf.resize(buf.capacity(), 0);
 
-    match ipc::fork() {
-        Ok(0) => {
+    match ipc::fork()? {
+        0 => {
             let listener = TcpListener::bind("0.0.0.0:18899")?;
             let (mut tcp, _) = listener.accept()?;
             let mut sum: isize = 0;
@@ -34,7 +34,7 @@ fn main() -> Result<()> {
                 eprintln!("sum error: {} != {}", sum, count * size);
             }
         }
-        Ok(_pid) => {
+        _pid => {
             // waiting for the server to start
             thread::sleep(Duration::from_secs(1));
 
@@ -54,7 +54,6 @@ fn main() -> Result<()> {
                 count as f64 / sec
             );
         }
-        Err(err) => return Err(err),
     }
 
     Ok(())
