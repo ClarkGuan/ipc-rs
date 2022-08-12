@@ -34,7 +34,9 @@ fn main() -> Result<()> {
             };
             // notify parent process
             sem.post()?;
-
+            // 超时 5s，无论如何都要退出
+            // 有可能出现丢包，造成没读到 count 个包无法退出循环
+            udp_svr.set_read_timeout(Some(Duration::from_secs(5)))?;
             for _ in 0..count {
                 sum += udp_svr.recv(&mut buf)? as isize;
             }
