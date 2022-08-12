@@ -1,0 +1,39 @@
+pipe
+128           256           512           1024          2048
+687MB/s       847MB/s       1716MB/s      2245MB/s      3097MB/s
+5630694msg/s  3468373msg/s  3513700msg/s  2299383msg/s  1585808msg/s
+
+fifo
+128           256           512           1024          2048
+259MB/s       530MB/s       1015MB/s      1812MB/s      3300MB/s
+2124021msg/s  2171977msg/s  2078137msg/s  1855312msg/s  1689480msg/s
+
+socketpair
+128           256           512           1024          2048
+236MB/s       456MB/s       1043MB/s      1528MB/s      2918MB/s
+1933483msg/s  1868453msg/s  2135375msg/s  1564222msg/s  1493858msg/s
+
+uds
+128          256          512          1024         2048
+93MB/s       177MB/s      325MB/s      674MB/s      1293MB/s
+761562msg/s  724480msg/s  665382msg/s  690034msg/s  662126msg/s
+
+tcp
+128           256           512           1024          2048
+141MB/s       329MB/s       565MB/s       1411MB/s      1550MB/s
+1155806msg/s  1346054msg/s  1157656msg/s  1445265msg/s  793519msg/s
+
+shm2
+128            256            512            1024           2048
+1579MB/s       2995MB/s       5438MB/s       10141MB/s      15842MB/s
+12937397msg/s  12267634msg/s  11137292msg/s  10384511msg/s  8111205msg/s
+
+mq
+128          256          512          1024         2048
+92MB/s       221MB/s      436MB/s      603MB/s      1233MB/s
+751371msg/s  904003msg/s  892937msg/s  617436msg/s  631074msg/s
+
+udp
+128          256          512          1024         2048
+60MB/s       129MB/s      263MB/s      487MB/s      970MB/s
+493099msg/s  527062msg/s  539225msg/s  498432msg/s  496649msg/s
