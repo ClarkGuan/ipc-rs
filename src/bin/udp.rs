@@ -30,6 +30,7 @@ fn main() -> Result<()> {
     match ipc::fork()? {
         0 => {
             init_logger("udp_svr.log");
+            info!("pid: {}", ipc::getpid());
 
             let mut sum: isize = 0;
             let udp_svr = loop {
@@ -69,6 +70,7 @@ fn main() -> Result<()> {
         }
         pid => {
             init_logger("udp_client.log");
+            info!("pid: {}", ipc::getpid());
 
             // wait for peer to start
             sem.wait()?;
@@ -86,7 +88,6 @@ fn main() -> Result<()> {
             udp_cli.connect("127.0.0.1:18899")?;
             let start = Instant::now();
             for c in 0..count {
-                info!("client prepare to send: {}", c);
                 match udp_cli.send(&buf) {
                     Ok(n) => {
                         if n != buf.len() {
@@ -107,7 +108,6 @@ fn main() -> Result<()> {
                     }
                 }
             }
-            info!("client finish sending: {:?}", Instant::now());
             let duration = Instant::now().duration_since(start);
             let sec = duration.as_micros() as f64 / 1000000f64;
             println!(
@@ -116,8 +116,10 @@ fn main() -> Result<()> {
                 count as f64 / sec
             );
 
-            ipc::waitpid(pid, flags::WNOHANG)?;
-            info!("parent exit! child pid: {}", pid);
+            let (pid, status) = ipc::waitpid(pid, 0)?;
+            info!("parent exit! child pid: {}, status: {}", pid, status);
+            fast_log::flush().expect("fast_log::flush");
+            thread::sleep(Duration::from_secs(1));
         }
     }
 

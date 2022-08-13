@@ -58,7 +58,7 @@ fn main() -> Result<()> {
                 count as f64 / sec
             );
 
-            ipc::waitpid(pid, flags::WNOHANG)?;
+            ipc::waitpid(pid, 0)?;
         }
     }
 
