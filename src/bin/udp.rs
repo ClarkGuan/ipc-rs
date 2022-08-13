@@ -77,7 +77,7 @@ fn main() -> Result<()> {
             sem.unlink_self()?;
 
             let udp_cli = loop {
-                match UdpSocket::bind("127.0.0.1:12345") {
+                match UdpSocket::bind("127.0.0.1:0") {
                     Ok(udp) => break udp,
                     _ => {
                         error!("UDP client retry binding");
