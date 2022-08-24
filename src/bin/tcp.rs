@@ -1,7 +1,7 @@
 use ipc::{flags, Result};
 use std::env;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{Shutdown, TcpListener, TcpStream};
 use std::process;
 use std::time::Instant;
 
@@ -57,6 +57,8 @@ fn main() -> Result<()> {
                 (size * count) as f64 / sec / (1024 * 1024) as f64,
                 count as f64 / sec
             );
+            // 防止死锁
+            tcp.shutdown(Shutdown::Both)?;
 
             ipc::waitpid(pid, 0)?;
         }
