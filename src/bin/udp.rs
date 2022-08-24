@@ -1,16 +1,10 @@
-use fast_log::Config;
 use ipc::sem::Semaphore;
 use ipc::{flags, Result};
 use log::{error, info};
 use std::net::UdpSocket;
+use std::process;
 use std::time::{Duration, Instant};
 use std::{env, thread};
-use std::{fs, process};
-
-fn init_logger(path: &str) {
-    let _ = fs::remove_file(path);
-    fast_log::init(Config::new().file(path)).expect("fast_log::init");
-}
 
 fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
@@ -29,7 +23,6 @@ fn main() -> Result<()> {
 
     match ipc::fork()? {
         0 => {
-            init_logger("udp_svr.log");
             info!("pid: {}", ipc::getpid());
 
             let mut sum: isize = 0;
@@ -57,9 +50,10 @@ fn main() -> Result<()> {
                             c,
                             Instant::now()
                         );
-                        fast_log::flush().expect("fast_log::flush");
-                        eprintln!("server error happen!!");
-                        thread::sleep(Duration::from_secs(3));
+                        eprintln!(
+                            "Packet loss found when recv, expect {} actually {}",
+                            count, c
+                        );
                         return Err(err.into());
                     }
                 }
@@ -69,7 +63,6 @@ fn main() -> Result<()> {
             }
         }
         pid => {
-            init_logger("udp_client.log");
             info!("pid: {}", ipc::getpid());
 
             // wait for peer to start
@@ -81,7 +74,6 @@ fn main() -> Result<()> {
                     Ok(udp) => break udp,
                     _ => {
                         error!("UDP client retry binding");
-                        thread::sleep(Duration::from_secs(1));
                     }
                 }
             };
@@ -102,7 +94,6 @@ fn main() -> Result<()> {
                             c,
                             Instant::now()
                         );
-                        fast_log::flush().expect("fast_log::flush");
                         eprintln!("client error happen!!");
                         return Err(err.into());
                     }
@@ -118,8 +109,6 @@ fn main() -> Result<()> {
 
             let (pid, status) = ipc::waitpid(pid, 0)?;
             info!("parent exit! child pid: {}, status: {}", pid, status);
-            fast_log::flush().expect("fast_log::flush");
-            thread::sleep(Duration::from_secs(1));
         }
     }
 
