@@ -50,7 +50,7 @@ fn main() -> Result<()> {
                     process::exit(1);
                 }
             }
-            let duration = Instant::now().duration_since(start);
+            let duration = start.elapsed();
             let sec = duration.as_micros() as f64 / 1000000f64;
             println!(
                 "{:.0} MB/s\t{:.0} msgs/s",
