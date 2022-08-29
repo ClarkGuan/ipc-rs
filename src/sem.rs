@@ -45,7 +45,6 @@ impl SemaphoreLike for *mut libc::sem_t {
 #[derive(Debug)]
 pub enum Semaphore {
     Anonymous(libc::sem_t),
-    AnonymousPtr(*mut libc::sem_t),
     Named(*mut libc::sem_t, String),
 }
 
@@ -57,15 +56,6 @@ impl Semaphore {
                 return_errno!("sem_init");
             }
             Ok(sem)
-        }
-    }
-
-    pub fn init_in_place(raw: *mut libc::sem_t, val: usize) -> Result<Semaphore> {
-        unsafe {
-            if libc::sem_init(raw, 1, val as _) == -1 {
-                return_errno!("sem_init");
-            }
-            Ok(Semaphore::AnonymousPtr(raw))
         }
     }
 
@@ -105,7 +95,6 @@ impl Semaphore {
     fn as_ptr_mut(&self) -> *mut libc::sem_t {
         match self {
             &Semaphore::Anonymous(ref sem) => unsafe { mem::transmute(sem) },
-            &Semaphore::AnonymousPtr(sem) => sem,
             &Semaphore::Named(sem, ..) => sem,
         }
     }
@@ -128,7 +117,7 @@ impl SemaphoreLike for Semaphore {
 impl Drop for Semaphore {
     fn drop(&mut self) {
         match self {
-            &mut Semaphore::Anonymous(..) | &mut Semaphore::AnonymousPtr(..) => unsafe {
+            &mut Semaphore::Anonymous(..) => unsafe {
                 assert_ne!(libc::sem_destroy(self.as_ptr_mut()), -1);
             },
 
@@ -148,5 +137,43 @@ impl From<*const u8> for &Semaphore {
 impl From<*mut u8> for &mut Semaphore {
     fn from(ptr: *mut u8) -> Self {
         unsafe { &mut *(ptr as *mut Semaphore) }
+    }
+}
+
+#[derive(Debug)]
+#[repr(transparent)]
+pub(crate) struct RawSemaphore(libc::sem_t);
+
+impl RawSemaphore {
+    pub(crate) fn init(&self, val: usize) {
+        if unsafe { libc::sem_init(self.as_ptr_mut(), 1, val as _) } == -1 {
+            panic_errno!("sem_init");
+        }
+    }
+
+    fn as_ptr_mut(&self) -> *mut libc::sem_t {
+        unsafe { mem::transmute(&self.0) }
+    }
+}
+
+impl SemaphoreLike for RawSemaphore {
+    fn value(&self) -> usize {
+        self.as_ptr_mut().value()
+    }
+
+    fn post(&self) {
+        self.as_ptr_mut().post()
+    }
+
+    fn wait(&self) {
+        self.as_ptr_mut().wait()
+    }
+}
+
+impl Drop for RawSemaphore {
+    fn drop(&mut self) {
+        unsafe {
+            assert_ne!(libc::sem_destroy(self.as_ptr_mut()), -1);
+        }
     }
 }
