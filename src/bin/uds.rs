@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     match ipc::fork()? {
         0 => {
             let listener = UnixListener::bind(path)?;
-            sem.post()?;
+            sem.post();
 
             let (mut stream, _) = listener.accept()?;
             let mut sum: isize = 0;
@@ -37,8 +37,8 @@ fn main() -> Result<()> {
         }
 
         pid => {
-            sem.wait()?;
-            sem.unlink_self()?;
+            sem.wait();
+            sem.unlink_self();
 
             let mut stream = UnixStream::connect(path)?;
             let start = Instant::now();

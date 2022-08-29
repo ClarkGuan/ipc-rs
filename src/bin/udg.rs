@@ -23,7 +23,7 @@ fn main() -> Result<()> {
     match ipc::fork()? {
         0 => {
             let datagram = UnixDatagram::bind(path)?;
-            sem.post()?;
+            sem.post();
 
             let mut sum: isize = 0;
             for _ in 0..count {
@@ -35,8 +35,8 @@ fn main() -> Result<()> {
         }
 
         pid => {
-            sem.wait()?;
-            sem.unlink_self()?;
+            sem.wait();
+            sem.unlink_self();
 
             let datagram = UnixDatagram::unbound()?;
             datagram.connect(path)?;

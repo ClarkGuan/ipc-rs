@@ -36,7 +36,7 @@ fn main() -> Result<()> {
                 }
             };
             // notify parent process
-            sem.post()?;
+            sem.post();
             // 超时时间到达后，无论如何都要退出
             // 有可能出现丢包，造成没读到 count 个包无法退出循环
             udp_svr.set_read_timeout(Some(Duration::from_secs(1)))?;
@@ -66,8 +66,8 @@ fn main() -> Result<()> {
             info!("pid: {}", ipc::getpid());
 
             // wait for peer to start
-            sem.wait()?;
-            sem.unlink_self()?;
+            sem.wait();
+            sem.unlink_self();
 
             let udp_cli = loop {
                 match UdpSocket::bind("127.0.0.1:0") {

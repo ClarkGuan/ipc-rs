@@ -59,6 +59,13 @@ pub(crate) fn strerror(errno: i32) -> Result<String> {
     }
 }
 
+macro_rules! panic_errno {
+    ($msg: expr) => {{
+        let errno = *libc::__errno_location();
+        panic!("{}: {}({})", $msg, $crate::errors::strerror(errno).unwrap(), errno)
+    }};
+}
+
 macro_rules! return_errno {
     ($msg: expr) => {{
         let errno = *libc::__errno_location();

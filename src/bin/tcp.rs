@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     match ipc::fork()? {
         0 => {
             let listener = TcpListener::bind("0.0.0.0:18899")?;
-            sem.post()?;
+            sem.post();
 
             let (mut tcp, _) = listener.accept()?;
             let mut sum: isize = 0;
@@ -40,8 +40,8 @@ fn main() -> Result<()> {
             }
         }
         pid => {
-            sem.wait()?;
-            sem.unlink_self()?;
+            sem.wait();
+            sem.unlink_self();
 
             let mut tcp = TcpStream::connect("0.0.0.0:18899")?;
             let start = Instant::now();

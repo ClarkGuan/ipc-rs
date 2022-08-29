@@ -1,6 +1,3 @@
-extern crate alloc;
-extern crate core;
-
 #[macro_use]
 mod errors;
 
@@ -9,7 +6,7 @@ pub mod mq;
 pub mod pipe;
 pub(crate) mod raw;
 pub mod sem;
-pub(crate) mod shm;
+//pub mod ring;
 
 pub use errors::Error;
 pub type Result<T> = std::result::Result<T, Error>;
