@@ -1,4 +1,4 @@
-use ipc::sem::Semaphore;
+use ipc::sem::{Semaphore, SemaphoreLike};
 use ipc::{flags, Result};
 use log::{error, info};
 use std::net::UdpSocket;

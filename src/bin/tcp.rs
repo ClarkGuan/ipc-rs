@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::process;
 use std::time::Instant;
+use ipc::sem::{Semaphore, SemaphoreLike};
 
 fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
@@ -18,7 +19,7 @@ fn main() -> Result<()> {
     let mut buf = Vec::with_capacity(size as _);
     buf.resize(buf.capacity(), 0);
 
-    let sem = ipc::sem::Semaphore::open("/sem_test", flags::O_CREAT | flags::O_RDWR, 0o666, 0)?;
+    let sem = Semaphore::open("/sem_test", flags::O_CREAT | flags::O_RDWR, 0o666, 0)?;
 
     match ipc::fork()? {
         0 => {

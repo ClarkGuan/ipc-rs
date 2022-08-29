@@ -1,4 +1,4 @@
-use ipc::sem::Semaphore;
+use ipc::sem::{Semaphore, SemaphoreLike};
 use ipc::{flags, Result};
 use std::io::{Read, Write};
 use std::os::unix::net::{UnixListener, UnixStream};

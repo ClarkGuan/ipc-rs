@@ -9,6 +9,7 @@ pub mod mq;
 pub mod pipe;
 pub(crate) mod raw;
 pub mod sem;
+pub(crate) mod shm;
 
 pub use errors::Error;
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1,4 +1,4 @@
-use ipc::{flags, Result};
+use ipc::Result;
 use std::env;
 use std::io::{Read, Write};
 use std::process;

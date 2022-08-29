@@ -1,9 +1,9 @@
-use ipc::{flags, Result};
+use ipc::pipe::Fifo;
+use ipc::Result;
 use std::env;
 use std::io::{Read, Write};
 use std::process;
 use std::time::Instant;
-use ipc::pipe::Fifo;
 
 fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
