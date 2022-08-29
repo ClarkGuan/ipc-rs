@@ -45,23 +45,27 @@ impl SemaphoreLike for *mut libc::sem_t {
 #[derive(Debug)]
 pub enum Semaphore {
     Anonymous(libc::sem_t),
+    AnonymousPtr(*mut libc::sem_t),
     Named(*mut libc::sem_t, String),
 }
 
 impl Semaphore {
     pub fn init(val: usize) -> Result<Semaphore> {
         unsafe {
-            let mut sem = Semaphore::Anonymous(MaybeUninit::uninit().assume_init());
-            sem.init_in_place(val);
+            let sem = Semaphore::Anonymous(MaybeUninit::uninit().assume_init());
+            if libc::sem_init(sem.as_ptr_mut(), 1, val as _) == -1 {
+                return_errno!("sem_init");
+            }
             Ok(sem)
         }
     }
 
-    pub fn init_in_place(&mut self, val: usize) {
-        if let &mut Semaphore::Anonymous(..) = self {
-            if unsafe { libc::sem_init(self.as_ptr_mut(), 1, val as _) } == -1 {
+    pub fn init_in_place(raw: *mut libc::sem_t, val: usize) -> Result<Semaphore> {
+        unsafe {
+            if libc::sem_init(raw, 1, val as _) == -1 {
                 return_errno!("sem_init");
             }
+            Ok(Semaphore::AnonymousPtr(raw))
         }
     }
 
@@ -101,6 +105,7 @@ impl Semaphore {
     fn as_ptr_mut(&self) -> *mut libc::sem_t {
         match self {
             &Semaphore::Anonymous(ref sem) => unsafe { mem::transmute(sem) },
+            &Semaphore::AnonymousPtr(sem) => sem,
             &Semaphore::Named(sem, ..) => sem,
         }
     }
@@ -123,7 +128,7 @@ impl SemaphoreLike for Semaphore {
 impl Drop for Semaphore {
     fn drop(&mut self) {
         match self {
-            &mut Semaphore::Anonymous(..) => unsafe {
+            &mut Semaphore::Anonymous(..) | &mut Semaphore::AnonymousPtr(..) => unsafe {
                 assert_ne!(libc::sem_destroy(self.as_ptr_mut()), -1);
             },
 
@@ -136,12 +141,12 @@ impl Drop for Semaphore {
 
 impl From<*const u8> for &Semaphore {
     fn from(ptr: *const u8) -> Self {
-        ptr as *const Semaphore as _
+        unsafe { &*(ptr as *const Semaphore) }
     }
 }
 
-impl From<*mut u8> for &Semaphore {
+impl From<*mut u8> for &mut Semaphore {
     fn from(ptr: *mut u8) -> Self {
-        ptr as *mut Semaphore as _
+        unsafe { &mut *(ptr as *mut Semaphore) }
     }
 }
