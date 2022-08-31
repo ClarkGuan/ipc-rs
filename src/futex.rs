@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::Result;
 use libc::{c_int, timespec};
 use std::ptr;

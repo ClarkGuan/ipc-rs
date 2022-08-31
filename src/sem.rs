@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::Result;
 use core::fmt::Debug;
 use libc::c_uint;

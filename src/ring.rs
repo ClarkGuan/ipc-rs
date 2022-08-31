@@ -1,17 +1,54 @@
-use crate::sem::RawSemaphore;
+use crate::futex;
+use crate::futex::WaitResult;
 use crate::Result;
 use libc::c_void;
 use std::ffi::CString;
 use std::io::{Read, Write};
 use std::{cmp, intrinsics, mem, ptr};
 
+#[repr(transparent)]
+#[derive(Debug)]
+struct Cond {
+    val: i32,
+}
+
+impl Cond {
+    fn init(&self) {
+        unsafe {
+            intrinsics::atomic_store(mem::transmute(&self.val), 0);
+        }
+    }
+
+    fn wait(&self) {
+        unsafe {
+            let (_, ret) = intrinsics::atomic_cxchg(mem::transmute(&self.val), 0, 1);
+            assert!(ret);
+            match futex::futex_wait(&self.val, 1) {
+                Ok(WaitResult::ValNotEqual) | Err(_) => panic!("futex_wait error"),
+                _ => (),
+            }
+        }
+    }
+
+    fn notify(&self) {
+        unsafe {
+            let (old, ret) = intrinsics::atomic_cxchg(mem::transmute(&self.val), 1, 0);
+            if old == 0 {
+                return;
+            }
+            assert!(ret);
+            assert_eq!(futex::futex_wake(&self.val, 1).unwrap(), 1);
+        }
+    }
+}
+
 #[repr(C)]
 struct Header {
     head: usize,
     tail: usize,
     size: usize,
-    sem_reader: RawSemaphore,
-    sem_writer: RawSemaphore,
+    reader: Cond,
+    writer: Cond,
 }
 
 impl Header {
@@ -19,8 +56,8 @@ impl Header {
         self.head = 0;
         self.tail = 0;
         self.size = size;
-        self.sem_writer.init(0);
-        self.sem_reader.init(0);
+        self.reader.init();
+        self.writer.init();
     }
 }
 
@@ -38,7 +75,7 @@ impl Buffer {
     const HEADER_SIZE: usize = mem::size_of::<Header>();
 
     pub fn new(name: &str, master: bool, size: usize) -> Result<Buffer> {
-        let size = size*2 + 1;
+        let size = size * 2 + 1;
         unsafe {
             let cstr = CString::new(name).expect("CString::new");
             let flags = if master {
@@ -117,31 +154,43 @@ impl Drop for Buffer {
 impl Read for Buffer {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         unsafe {
-            let head = intrinsics::atomic_load(&self.as_header().head);
-            let tail = intrinsics::atomic_load(&self.as_header().tail);
+            loop {
+                let head = intrinsics::atomic_load(&self.as_header().head);
+                let tail = intrinsics::atomic_load(&self.as_header().tail);
 
-            return if head == tail {
-                Ok(0)
-            } else if head < tail {
-                let need_copy = cmp::min(buf.len(), tail - head);
-                ptr::copy(self.data.add(head), buf.as_mut_ptr(), need_copy);
-                intrinsics::atomic_xadd(&mut self.as_header_mut().head, need_copy);
-                Ok(need_copy)
-            } else {
-                let size = self.as_header().size;
-                let need_copy = cmp::min(tail + size - head, buf.len());
-                if need_copy <= size - head {
+                return if head == tail {
+                    if let (_, true) =
+                        intrinsics::atomic_cxchg(&mut self.as_header_mut().tail, tail, tail)
+                    {
+                        // 没有什么可读的
+                        self.as_header().reader.wait();
+                    }
+                    continue;
+                } else if head < tail {
+                    let need_copy = cmp::min(buf.len(), tail - head);
                     ptr::copy(self.data.add(head), buf.as_mut_ptr(), need_copy);
                     intrinsics::atomic_xadd(&mut self.as_header_mut().head, need_copy);
+
+                    self.as_header().writer.notify();
+                    Ok(need_copy)
                 } else {
-                    let first_write = size - head;
-                    ptr::copy(self.data.add(head), buf.as_mut_ptr(), first_write);
-                    let left = need_copy - first_write;
-                    ptr::copy(self.data, buf.as_mut_ptr().add(first_write), left);
-                    intrinsics::atomic_store(&mut self.as_header_mut().head, left);
-                }
-                Ok(need_copy)
-            };
+                    let size = self.as_header().size;
+                    let need_copy = cmp::min(tail + size - head, buf.len());
+                    if need_copy <= size - head {
+                        ptr::copy(self.data.add(head), buf.as_mut_ptr(), need_copy);
+                        intrinsics::atomic_xadd(&mut self.as_header_mut().head, need_copy);
+                    } else {
+                        let first_write = size - head;
+                        ptr::copy(self.data.add(head), buf.as_mut_ptr(), first_write);
+                        let left = need_copy - first_write;
+                        ptr::copy(self.data, buf.as_mut_ptr().add(first_write), left);
+                        intrinsics::atomic_store(&mut self.as_header_mut().head, left);
+                    }
+
+                    self.as_header().writer.notify();
+                    Ok(need_copy)
+                };
+            }
         }
     }
 }
@@ -149,43 +198,55 @@ impl Read for Buffer {
 impl Write for Buffer {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         unsafe {
-            let head = intrinsics::atomic_load(&self.as_header().head);
-            let tail = intrinsics::atomic_load(&self.as_header().tail);
+            loop {
+                let head = intrinsics::atomic_load(&self.as_header().head);
+                let tail = intrinsics::atomic_load(&self.as_header().tail);
 
-            return if head > 0 && tail == head - 1 {
-                Ok(0)
-            } else if tail < head {
-                let need_write = cmp::min(buf.len(), head - tail - 1);
-                ptr::copy(
-                    buf.as_ptr(),
-                    self.data.add(self.as_header().tail),
-                    need_write,
-                );
-                intrinsics::atomic_xadd(&mut self.as_header_mut().tail, need_write);
-                Ok(need_write)
-            } else {
-                let size = self.as_header().size;
-                let need_write = cmp::min(buf.len(), size + head - 1 - tail);
-                if need_write <= size - tail {
+                return if head > 0 && tail == head - 1 {
+                    if let (_, true) =
+                        intrinsics::atomic_cxchg(&mut self.as_header_mut().head, head, head)
+                    {
+                        // 没有什么可写的
+                        self.as_header().writer.wait();
+                    }
+                    continue;
+                } else if tail < head {
+                    let need_write = cmp::min(buf.len(), head - tail - 1);
                     ptr::copy(
                         buf.as_ptr(),
                         self.data.add(self.as_header().tail),
                         need_write,
                     );
                     intrinsics::atomic_xadd(&mut self.as_header_mut().tail, need_write);
+
+                    self.as_header().reader.notify();
+                    Ok(need_write)
                 } else {
-                    let first_copy = size - tail;
-                    ptr::copy(
-                        buf.as_ptr(),
-                        self.data.add(self.as_header().tail),
-                        first_copy,
-                    );
-                    let left = need_write - first_copy;
-                    ptr::copy(buf.as_ptr().add(first_copy), self.data, left);
-                    intrinsics::atomic_store(&mut self.as_header_mut().tail, left);
-                }
-                Ok(need_write)
-            };
+                    let size = self.as_header().size;
+                    let need_write = cmp::min(buf.len(), size + head - 1 - tail);
+                    if need_write <= size - tail {
+                        ptr::copy(
+                            buf.as_ptr(),
+                            self.data.add(self.as_header().tail),
+                            need_write,
+                        );
+                        intrinsics::atomic_xadd(&mut self.as_header_mut().tail, need_write);
+                    } else {
+                        let first_copy = size - tail;
+                        ptr::copy(
+                            buf.as_ptr(),
+                            self.data.add(self.as_header().tail),
+                            first_copy,
+                        );
+                        let left = need_write - first_copy;
+                        ptr::copy(buf.as_ptr().add(first_copy), self.data, left);
+                        intrinsics::atomic_store(&mut self.as_header_mut().tail, left);
+                    }
+
+                    self.as_header().reader.notify();
+                    Ok(need_write)
+                };
+            }
         }
     }
 
