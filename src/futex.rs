@@ -1,8 +1,7 @@
 use crate::Result;
 use libc::{c_int, timespec};
-use std::ops::Add;
 use std::ptr;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 unsafe fn syscall_futex(
     addr: *const c_int,
@@ -21,7 +20,14 @@ unsafe fn syscall_futex(
     }
 }
 
-pub(crate) fn futex_wait(addr: &i32, val: i32) -> Result<()> {
+#[derive(Debug)]
+pub enum WaitResult {
+    OK,
+    ValNotEqual,
+    Timeout,
+}
+
+pub fn futex_wait(addr: &i32, val: i32) -> Result<WaitResult> {
     unsafe {
         if syscall_futex(
             addr,
@@ -32,14 +38,17 @@ pub(crate) fn futex_wait(addr: &i32, val: i32) -> Result<()> {
             0,
         ) == -1
         {
+            if *libc::__errno_location() == libc::EAGAIN {
+                return Ok(WaitResult::ValNotEqual);
+            }
             return_errno!("futex");
         }
 
-        Ok(())
+        Ok(WaitResult::OK)
     }
 }
 
-pub(crate) fn futex_wake(addr: &i32, num_processes: i32) -> Result<i32> {
+pub fn futex_wake(addr: &i32, num_processes: i32) -> Result<i32> {
     unsafe {
         let ret = syscall_futex(
             addr,
@@ -57,14 +66,10 @@ pub(crate) fn futex_wake(addr: &i32, num_processes: i32) -> Result<i32> {
     }
 }
 
-pub(crate) fn futex_timed_wait(addr: &i32, val: i32, timeout: Duration) -> Result<bool> {
-    let target = SystemTime::UNIX_EPOCH
-        .elapsed()
-        .expect("SystemTime::UNIX_EPOCH.elapsed()")
-        .add(timeout);
+pub fn futex_timed_wait(addr: &i32, val: i32, timeout: Duration) -> Result<WaitResult> {
     let timespec = timespec {
-        tv_sec: target.as_secs() as _,
-        tv_nsec: target.subsec_nanos() as _,
+        tv_sec: timeout.as_secs() as _,
+        tv_nsec: timeout.subsec_nanos() as _,
     };
     unsafe {
         let ret = syscall_futex(
@@ -76,12 +81,13 @@ pub(crate) fn futex_timed_wait(addr: &i32, val: i32, timeout: Duration) -> Resul
             0,
         );
         if ret == -1 {
-            if *libc::__errno_location() == libc::ETIMEDOUT {
-                return Ok(true);
+            match *libc::__errno_location() {
+                libc::ETIMEDOUT => return Ok(WaitResult::Timeout),
+                libc::EAGAIN => return Ok(WaitResult::ValNotEqual),
+                _ => return_errno!("futex"),
             }
-            return_errno!("futex");
         }
 
-        Ok(false)
+        Ok(WaitResult::OK)
     }
 }

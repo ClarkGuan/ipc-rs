@@ -11,7 +11,7 @@ pub mod pipe;
 pub(crate) mod raw;
 pub mod sem;
 pub mod ring;
-pub(crate) mod futex;
+pub mod futex;
 
 pub use errors::Error;
 pub type Result<T> = std::result::Result<T, Error>;
