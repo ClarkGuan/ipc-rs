@@ -79,7 +79,7 @@ impl Buffer {
         unsafe {
             let cstr = CString::new(name).expect("CString::new");
             let flags = if master {
-                libc::O_RDWR | libc::O_CREAT
+                libc::O_RDWR | libc::O_CREAT | libc::O_EXCL
             } else {
                 libc::O_RDWR
             };
@@ -162,8 +162,9 @@ impl Read for Buffer {
                     if let (_, true) =
                         intrinsics::atomic_cxchg(&mut self.as_header_mut().tail, tail, tail)
                     {
-                        // 没有什么可读的
+                        println!("reader sleep");
                         self.as_header().reader.wait();
+                        println!("reader awake");
                     }
                     continue;
                 } else if head < tail {
@@ -206,8 +207,9 @@ impl Write for Buffer {
                     if let (_, true) =
                         intrinsics::atomic_cxchg(&mut self.as_header_mut().head, head, head)
                     {
-                        // 没有什么可写的
+                        println!("writer sleep");
                         self.as_header().writer.wait();
+                        println!("writer awake");
                     }
                     continue;
                 } else if tail < head {

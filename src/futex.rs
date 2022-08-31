@@ -13,23 +13,34 @@ unsafe fn syscall_futex(
     addr2: *const c_int,
     val3: c_int,
 ) -> c_int {
-    let now = Instant::now();
-    let timeout = Duration::from_timespec(&*timeout);
-    loop {
-        let left = timeout.saturating_sub(now.elapsed());
-        let ret: c_int = libc::syscall(
-            libc::SYS_futex,
-            addr,
-            op,
-            val,
-            &left.as_timespec(),
-            addr2,
-            val3,
-        ) as _;
-        if ret == -1 && *libc::__errno_location() == libc::EINTR {
-            continue;
+    if timeout.is_null() {
+        loop {
+            let ret: c_int =
+                libc::syscall(libc::SYS_futex, addr, op, val, timeout, addr2, val3) as _;
+            if ret == -1 && *libc::__errno_location() == libc::EINTR {
+                continue;
+            }
+            return ret;
         }
-        return ret;
+    } else {
+        let now = Instant::now();
+        let timeout = Duration::from_timespec(&*timeout);
+        loop {
+            let left = timeout.saturating_sub(now.elapsed());
+            let ret: c_int = libc::syscall(
+                libc::SYS_futex,
+                addr,
+                op,
+                val,
+                &left.as_timespec(),
+                addr2,
+                val3,
+            ) as _;
+            if ret == -1 && *libc::__errno_location() == libc::EINTR {
+                continue;
+            }
+            return ret;
+        }
     }
 }
 
