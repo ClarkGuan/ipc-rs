@@ -38,7 +38,7 @@ impl Buffer {
     const HEADER_SIZE: usize = mem::size_of::<Header>();
 
     pub fn new(name: &str, master: bool, size: usize) -> Result<Buffer> {
-        let size = size + 1;
+        let size = size*2 + 1;
         unsafe {
             let cstr = CString::new(name).expect("CString::new");
             let flags = if master {
