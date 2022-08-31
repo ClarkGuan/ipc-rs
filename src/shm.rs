@@ -11,6 +11,9 @@ pub struct Shm {
     name: String,
 }
 
+unsafe impl Send for Shm {}
+unsafe impl Sync for Shm {}
+
 impl Shm {
     pub fn open(name: &str, size: usize, owner: bool) -> Result<Shm> {
         unsafe {
