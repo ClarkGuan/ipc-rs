@@ -82,10 +82,11 @@ impl Buffer {
     const HEADER_SIZE: usize = mem::size_of::<Header>();
 
     pub fn new(name: &str, master: bool, size: u32) -> Result<Buffer> {
-        let total_size = Self::HEADER_SIZE + size as usize * 2 + 1;
+        let data_size = size * 4 + 1;  // 缓存大小直接影响读写效率
+        let total_size = Self::HEADER_SIZE + data_size as usize;
         let mut buf = Buffer(Shm::open(name, total_size, master)?);
         if master {
-            buf.header_mut().init(size * 2 + 1); // 可能会溢出
+            buf.header_mut().init(data_size); // 可能会溢出
         }
         Ok(buf)
     }
