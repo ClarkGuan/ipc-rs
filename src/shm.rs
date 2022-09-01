@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::Result;
 use std::ffi::CString;
 use std::{ptr, slice};

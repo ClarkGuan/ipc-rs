@@ -56,6 +56,16 @@ impl Header {
     }
 }
 
+fn copy<R: AsRef<[u8]>, W: AsMut<[u8]>>(src: R, mut dst: W) -> u64 {
+    let r = src.as_ref();
+    let w = dst.as_mut();
+    let max = cmp::min(r.len(), w.len());
+    unsafe {
+        ptr::copy(r.as_ptr(), w.as_mut_ptr(), max);
+    }
+    max as _
+}
+
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Buffer(Shm);
@@ -125,21 +135,6 @@ impl Read for Buffer {
             };
         }
     }
-}
-
-// fn copy<R: Read + ?Sized, W: Write + ?Sized>(r: &R, w: &mut W) -> io::Result<u64> {
-//     #[allow(mutable_transmutes)]
-//     unsafe { io::copy::<R, W>(mem::transmute(r), w) }
-// }
-
-fn copy<R: AsRef<[u8]>, W: AsMut<[u8]>>(src: R, mut dst: W) -> u64 {
-    let r = src.as_ref();
-    let w = dst.as_mut();
-    let max = cmp::min(r.len(), w.len());
-    unsafe {
-        ptr::copy(r.as_ptr(), w.as_mut_ptr(), max);
-    }
-    max as _
 }
 
 impl Write for Buffer {
