@@ -42,8 +42,7 @@ fn main() -> Result<()> {
 
             let mut ring_buf = Buffer::new("/shm_ring", false, size as _)?;
             let start = Instant::now();
-            for i in 0..count {
-                println!("write count: {}", i+1);
+            for _ in 0..count {
                 let mut tmp = &buf[..];
                 while tmp.len() > 0 {
                     let n = ring_buf.write(tmp)?;

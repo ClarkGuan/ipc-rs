@@ -51,12 +51,12 @@ pub enum WaitResult {
     Timeout,
 }
 
-pub fn futex_wait(addr: &i32, val: i32) -> Result<WaitResult> {
+pub fn futex_wait(addr: &u32, val: u32) -> Result<WaitResult> {
     unsafe {
         if syscall_futex(
-            addr,
+            addr as *const u32 as _,
             libc::FUTEX_WAIT,
-            val,
+            val as _,
             ptr::null::<timespec>(),
             ptr::null::<c_int>(),
             0,
@@ -72,12 +72,12 @@ pub fn futex_wait(addr: &i32, val: i32) -> Result<WaitResult> {
     }
 }
 
-pub fn futex_wake(addr: &i32, num_processes: i32) -> Result<i32> {
+pub fn futex_wake(addr: &u32, num_processes: u32) -> Result<u32> {
     unsafe {
         let ret = syscall_futex(
-            addr,
+            addr as *const u32 as _,
             libc::FUTEX_WAKE,
-            num_processes,
+            num_processes as _,
             ptr::null::<timespec>(),
             ptr::null::<c_int>(),
             0,
@@ -86,16 +86,16 @@ pub fn futex_wake(addr: &i32, num_processes: i32) -> Result<i32> {
             return_errno!("futex");
         }
 
-        Ok(ret)
+        Ok(ret as _)
     }
 }
 
-pub fn futex_timed_wait(addr: &i32, val: i32, timeout: Duration) -> Result<WaitResult> {
+pub fn futex_timed_wait(addr: &u32, val: u32, timeout: Duration) -> Result<WaitResult> {
     unsafe {
         let ret = syscall_futex(
-            addr,
+            addr as *const u32 as _,
             libc::FUTEX_WAIT,
-            val,
+            val as _,
             &timeout.as_timespec(),
             ptr::null::<c_int>(),
             0,
