@@ -2,7 +2,7 @@ use crate::futex;
 use crate::shm::Shm;
 use crate::Result;
 use std::io::{Read, Write};
-use std::{cmp, intrinsics, io, mem, ptr};
+use std::{cmp, intrinsics, io, mem};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -56,16 +56,6 @@ impl Header {
     }
 }
 
-fn copy<R: AsRef<[u8]>, W: AsMut<[u8]>>(src: R, mut dst: W) -> u64 {
-    let r = src.as_ref();
-    let w = dst.as_mut();
-    let max = cmp::min(r.len(), w.len());
-    unsafe {
-        ptr::copy(r.as_ptr(), w.as_mut_ptr(), max);
-    }
-    max as _
-}
-
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Buffer(Shm);
@@ -92,7 +82,7 @@ impl Buffer {
     const HEADER_SIZE: usize = mem::size_of::<Header>();
 
     pub fn new(name: &str, master: bool, size: u32) -> Result<Buffer> {
-        let data_size = size * 4 + 1;  // 缓存大小直接影响读写效率
+        let data_size = size * 4 + 1; // 缓存大小直接影响读写效率
         let total_size = Self::HEADER_SIZE + data_size as usize;
         let mut buf = Buffer(Shm::open(name, total_size, master)?);
         if master {
@@ -113,7 +103,7 @@ impl Read for Buffer {
                 continue;
             } else if head < tail {
                 let need_copy = cmp::min(buf.len(), (tail - head) as usize);
-                copy(&self.data()[head as usize..], &mut buf[..need_copy]);
+                (&mut buf[..need_copy]).write(&self.data()[head as usize..])?;
                 self.header_mut().set_head(head + need_copy as u32);
                 self.header_mut().writer_notify();
                 Ok(need_copy)
@@ -121,13 +111,13 @@ impl Read for Buffer {
                 let size = self.header().size;
                 let need_copy = cmp::min((tail + size - head) as usize, buf.len());
                 if need_copy <= (size - head) as usize {
-                    copy(&self.data_mut()[head as usize..], &mut buf[..need_copy]);
+                    (&mut buf[..need_copy]).write(&self.data_mut()[head as usize..])?;
                     self.header_mut().set_head(head + need_copy as u32);
                 } else {
                     let first_write = (size - head) as usize;
-                    copy(&self.data_mut()[head as usize..], &mut buf[..first_write]);
+                    (&mut buf[..first_write]).write(&self.data_mut()[head as usize..])?;
                     let left = need_copy - first_write;
-                    copy(&self.data_mut()[..left], &mut buf[first_write..]);
+                    (&mut buf[first_write..]).write(&self.data_mut()[..left])?;
                     self.header_mut().set_head(left as _);
                 }
                 self.header_mut().writer_notify();
@@ -148,7 +138,7 @@ impl Write for Buffer {
                 continue;
             } else if tail < head {
                 let need_copy = cmp::min(buf.len(), (head - tail - 1) as usize);
-                copy(&buf[..need_copy], &mut self.data_mut()[tail as usize..]);
+                (&mut self.data_mut()[tail as usize..]).write(&buf[..need_copy])?;
                 self.header_mut().set_tail(tail + need_copy as u32);
                 self.header_mut().reader_notify();
                 Ok(need_copy)
@@ -156,13 +146,13 @@ impl Write for Buffer {
                 let size = self.header().size;
                 let need_copy = cmp::min(buf.len(), (size + head - 1 - tail) as usize);
                 if need_copy <= (size - tail) as usize {
-                    copy(&buf[..need_copy], &mut self.data_mut()[tail as usize..]);
+                    (&mut self.data_mut()[tail as usize..]).write(&buf[..need_copy])?;
                     self.header_mut().set_tail(tail + need_copy as u32);
                 } else {
                     let first_copy = (size - tail) as usize;
-                    copy(&buf[..first_copy], &mut self.data_mut()[tail as usize..]);
+                    (&mut self.data_mut()[tail as usize..]).write(&buf[..first_copy])?;
                     let left = need_copy - first_copy;
-                    copy(&buf[first_copy..], &mut self.data_mut()[..left]);
+                    (&mut self.data_mut()[..left]).write(&buf[first_copy..])?;
                     self.header_mut().set_tail(left as _);
                 }
                 self.header_mut().reader_notify();
