@@ -1,3 +1,4 @@
+#[cfg(feature = "ring-futex")]
 use crate::futex;
 use crate::shm::Shm;
 use crate::Result;
@@ -39,19 +40,23 @@ impl Header {
         }
     }
 
-    fn reader_wait(&mut self, expect_tail: u32) {
+    fn reader_wait(&mut self, #[allow(unused_variables)] expect_tail: u32) {
+        #[cfg(feature = "ring-futex")]
         futex::futex_wait(&self.tail, expect_tail).expect("futex::futex_wait");
     }
 
-    fn writer_wait(&mut self, expect_head: u32) {
+    fn writer_wait(&mut self, #[allow(unused_variables)] expect_head: u32) {
+        #[cfg(feature = "ring-futex")]
         futex::futex_wait(&self.head, expect_head).expect("futex::futex_wait");
     }
 
     fn reader_notify(&mut self) {
+        #[cfg(feature = "ring-futex")]
         futex::futex_wake(&self.tail, 1).expect("futex::futex_wake");
     }
 
     fn writer_notify(&mut self) {
+        #[cfg(feature = "ring-futex")]
         futex::futex_wake(&self.head, 1).expect("futex::futex_wake");
     }
 }
@@ -80,10 +85,11 @@ impl Buffer {
 
 impl Buffer {
     const HEADER_SIZE: usize = mem::size_of::<Header>();
+    #[cfg(feature = "ring-futex-retry")]
     const MAX_LOCK_RETRY_COUNT: usize = 256;
 
     pub fn new(name: &str, master: bool, size: u32) -> Result<Buffer> {
-        let data_size = size * 4 + 1; // 缓存大小直接影响读写效率
+        let data_size = size * 2 + 1; // 缓存大小直接影响读写效率
         let total_size = Self::HEADER_SIZE + data_size as usize;
         let mut buf = Buffer(Shm::open(name, total_size, master)?);
         if master {
@@ -95,12 +101,14 @@ impl Buffer {
 
 impl Read for Buffer {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        #[cfg(feature = "ring-futex-retry")]
         let mut retry_count = 0;
         loop {
             let head = self.header().head();
             let tail = self.header().tail();
 
             return if head == tail {
+                #[cfg(feature = "ring-futex-retry")]
                 if retry_count < Self::MAX_LOCK_RETRY_COUNT {
                     retry_count += 1;
                     continue;
@@ -135,12 +143,14 @@ impl Read for Buffer {
 
 impl Write for Buffer {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        #[cfg(feature = "ring-futex-retry")]
         let mut retry_count = 0;
         loop {
             let head = self.header().head();
             let tail = self.header().tail();
 
             return if head > 0 && tail == head - 1 {
+                #[cfg(feature = "ring-futex-retry")]
                 if retry_count < Self::MAX_LOCK_RETRY_COUNT {
                     retry_count += 1;
                     continue;
