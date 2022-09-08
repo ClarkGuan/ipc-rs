@@ -80,6 +80,7 @@ impl Buffer {
 
 impl Buffer {
     const HEADER_SIZE: usize = mem::size_of::<Header>();
+    const MAX_LOCK_RETRY_COUNT: usize = 256;
 
     pub fn new(name: &str, master: bool, size: u32) -> Result<Buffer> {
         let data_size = size * 4 + 1; // 缓存大小直接影响读写效率
@@ -94,11 +95,16 @@ impl Buffer {
 
 impl Read for Buffer {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let mut retry_count = 0;
         loop {
             let head = self.header().head();
             let tail = self.header().tail();
 
             return if head == tail {
+                if retry_count < Self::MAX_LOCK_RETRY_COUNT {
+                    retry_count += 1;
+                    continue;
+                }
                 self.header_mut().reader_wait(tail);
                 continue;
             } else if head < tail {
@@ -129,11 +135,16 @@ impl Read for Buffer {
 
 impl Write for Buffer {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let mut retry_count = 0;
         loop {
             let head = self.header().head();
             let tail = self.header().tail();
 
             return if head > 0 && tail == head - 1 {
+                if retry_count < Self::MAX_LOCK_RETRY_COUNT {
+                    retry_count += 1;
+                    continue;
+                }
                 self.header_mut().writer_wait(head);
                 continue;
             } else if tail < head {
