@@ -1,4 +1,4 @@
-use crate::{Error, Result};
+use crate::{errors::libc_errno, Error, Result};
 use std::ffi::CString;
 use std::fmt::{Debug, Formatter};
 use std::mem::MaybeUninit;
@@ -41,7 +41,7 @@ impl MessageQueue {
 
     pub fn set_attributes(&mut self, attr: &MQAttribute) -> Result<()> {
         unsafe {
-            if libc::mq_setattr(self.inner, &attr.0, std::ptr::null_mut()) == -1 {
+            if libc::mq_setattr(self.inner, &attr.0, ptr::null_mut()) == -1 {
                 return_errno!("mq_setattr");
             }
             Ok(())
@@ -83,7 +83,7 @@ impl io::Write for MessageQueue {
             let size = buf.len();
             let ret = libc::mq_send(self.inner, buf.as_ptr() as *const _, size as _, 0);
             if ret == -1 {
-                return Err(io::Error::from_raw_os_error(*libc::__errno_location() as _));
+                return Err(io::Error::from_raw_os_error(libc_errno() as _));
             }
             Ok(size)
         }
@@ -105,7 +105,7 @@ impl io::Read for MessageQueue {
                 ptr::null_mut(),
             );
             if n == -1 {
-                return Err(io::Error::from_raw_os_error(*libc::__errno_location() as _));
+                return Err(io::Error::from_raw_os_error(libc_errno() as _));
             }
             Ok(n as _)
         }

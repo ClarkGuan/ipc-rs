@@ -1,18 +1,23 @@
 #![feature(core_intrinsics)]
 
-extern crate core;
+use cfg_if::cfg_if;
 
 #[macro_use]
 mod errors;
 
 pub mod flags;
-pub mod mq;
+pub(crate) mod futex;
 pub mod pipe;
 pub(crate) mod raw;
 pub mod sem;
-pub mod ring;
-pub(crate) mod futex;
-pub(crate) mod shm;
+
+cfg_if! {
+    if #[cfg(not(target_os = "android"))] {
+        pub mod mq;
+        pub mod ring;
+        pub(crate) mod shm;
+    }
+}
 
 pub use errors::Error;
 pub type Result<T> = std::result::Result<T, Error>;

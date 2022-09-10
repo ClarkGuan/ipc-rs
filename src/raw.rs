@@ -1,3 +1,4 @@
+use crate::errors::libc_errno;
 use std::io::{self, Read, Write};
 
 pub(crate) struct RawFd(pub(crate) libc::c_int);
@@ -30,7 +31,7 @@ fn inner_raed(fd: libc::c_int, buf: &mut [u8]) -> io::Result<usize> {
     unsafe {
         let n = libc::read(fd, buf.as_mut_ptr() as _, buf.len() as _);
         if n == -1 {
-            return Err(io::Error::from_raw_os_error(*libc::__errno_location() as _));
+            return Err(io::Error::from_raw_os_error(libc_errno() as _));
         }
         Ok(n as _)
     }
@@ -40,7 +41,7 @@ fn inner_write(fd: libc::c_int, buf: &[u8]) -> io::Result<usize> {
     unsafe {
         let n = libc::write(fd, buf.as_ptr() as _, buf.len() as _);
         if n == -1 {
-            return Err(io::Error::from_raw_os_error(*libc::__errno_location() as _));
+            return Err(io::Error::from_raw_os_error(libc_errno() as _));
         }
         Ok(n as _)
     }

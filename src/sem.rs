@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::Result;
+use crate::{errors::libc_errno, Result};
 use core::fmt::Debug;
 use libc::c_uint;
 use std::ffi::CString;
@@ -35,7 +35,7 @@ impl SemaphoreLike for *mut libc::sem_t {
     fn wait(&self) {
         unsafe {
             while libc::sem_wait(*self) == -1 {
-                if *libc::__errno_location() == libc::EINTR {
+                if libc_errno() == libc::EINTR {
                     continue;
                 }
                 panic_errno!("sem_wait");

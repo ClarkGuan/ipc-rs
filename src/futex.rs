@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::Result;
+use crate::{errors::libc_errno, Result};
 use libc::{c_int, timespec};
 use std::ptr;
 use std::time::{Duration, Instant};
@@ -17,7 +17,7 @@ unsafe fn syscall_futex(
         loop {
             let ret: c_int =
                 libc::syscall(libc::SYS_futex, addr, op, val, timeout, addr2, val3) as _;
-            if ret == -1 && *libc::__errno_location() == libc::EINTR {
+            if ret == -1 && libc_errno() == libc::EINTR {
                 continue;
             }
             return ret;
@@ -36,7 +36,7 @@ unsafe fn syscall_futex(
                 addr2,
                 val3,
             ) as _;
-            if ret == -1 && *libc::__errno_location() == libc::EINTR {
+            if ret == -1 && libc_errno() == libc::EINTR {
                 continue;
             }
             return ret;
@@ -62,7 +62,7 @@ pub fn futex_wait(addr: &u32, val: u32) -> Result<WaitResult> {
             0,
         ) == -1
         {
-            if *libc::__errno_location() == libc::EAGAIN {
+            if libc_errno() == libc::EAGAIN {
                 return Ok(WaitResult::ValNotEqual);
             }
             return_errno!("futex");
@@ -101,7 +101,7 @@ pub fn futex_timed_wait(addr: &u32, val: u32, timeout: Duration) -> Result<WaitR
             0,
         );
         if ret == -1 {
-            match *libc::__errno_location() {
+            match libc_errno() {
                 libc::ETIMEDOUT => return Ok(WaitResult::Timeout),
                 libc::EAGAIN => return Ok(WaitResult::ValNotEqual),
                 _ => return_errno!("futex"),
